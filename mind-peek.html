@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🤖 Mind Peek — AI 脑子里的世界</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', system-ui, -apple-system, sans-serif;
+    background: #2b2b2b; min-height: 100vh;
+    display: flex; justify-content: center; align-items: center; padding: 20px;
+  }
+  ::selection { background: #ffd54f44; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+  .container {
+    width: 100%; max-width: 1200px; background: #363636;
+    border-radius: 24px; padding: 30px 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .header {
+    display: flex; align-items: center; gap: 18px;
+    margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .avatar-wrap { position: relative; width: 60px; height: 60px; flex-shrink: 0; }
+  .avatar {
+    width: 100%; height: 100%; border-radius: 50%; background: #4a4a4a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; transition: transform .2s; cursor: default; user-select: none;
+  }
+  .avatar:active { transform: scale(.9) rotate(15deg); }
+  .mood-ring {
+    position: absolute; inset: -4px; border-radius: 50%;
+    border: 3px solid transparent;
+    animation: moodPulse 3s ease-in-out infinite;
+  }
+  @keyframes moodPulse { 0%,100%{transform:scale(1);opacity:.6} 50%{transform:scale(1.08);opacity:1} }
+  .title-area { flex: 1; min-width: 120px; }
+  .title-area h1 { color: #eee; font-size: 22px; font-weight: 700; letter-spacing: .5px; }
+  .title-area .mood-label {
+    color: #aaa; font-size: 13px; margin-top: 2px;
+    cursor: pointer; transition: color .2s;
+  }
+  .title-area .mood-label:hover { color: #fff; }
+  .stats-badge { display: flex; gap: 10px; flex-wrap: wrap; color: #bbb; font-size: 13px; align-items: center; }
+  .stats-badge span {
+    background: #444; padding: 5px 12px; border-radius: 20px; white-space: nowrap;
+    transition: background .2s; cursor: default;
+  }
+  .stats-badge span:hover { background: #505050; }
+  .export-btn {
+    background: #5dade2; color: #fff; border: none;
+    border-radius: 8px; padding: 5px 14px; font-size: 12px;
+    cursor: pointer; transition: background .2s;
+  }
+  .export-btn:hover { background: #4a9dcc; }
+  .tabs {
+    display: flex; gap: 4px; margin-bottom: 20px; background: #404040;
+    border-radius: 12px; padding: 4px; flex-wrap: wrap;
+  }
+  .tab {
+    flex: 1; text-align: center; padding: 10px 0; min-width: 80px;
+    color: #999; cursor: pointer; border-radius: 10px;
+    font-size: 13px; font-weight: 500; transition: all .25s;
+  }
+  .tab.active { background: #5a5a5a; color: #fff; }
+  .tab:hover:not(.active) { color: #ddd; }
+  .panel { display: none; animation: fadeIn .35s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .board { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+  .note {
+    width: 200px; min-height: 120px; padding: 14px 12px 10px;
+    border-radius: 4px; font-size: 13px; line-height: 1.5;
+    position: relative; cursor: pointer;
+    box-shadow: 2px 3px 8px rgba(0,0,0,.25);
+    transition: transform .2s, box-shadow .2s; word-break: break-word;
+    display: flex; flex-direction: column;
+    border: 1px solid transparent; /* 让动态 borderColor 生效 */
+  }
+  .note:hover { transform: translateY(-4px) rotate(-.5deg); box-shadow: 4px 6px 16px rgba(0,0,0,.35); }
+  .note .tag {
+    position: absolute; top: -6px; right: 8px; font-size: 11px; padding: 1px 8px;
+    border-radius: 8px; color: #fff; opacity: .85;
+  }
+  .note .topic { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .note .content { font-size: 12px; opacity: .85; flex: 1; }
+  .note .source { font-size: 10px; opacity: .5; margin-top: 6px; }
+  .note-memory { background: #c7e4f0; color: #1a3a4a; }
+  .note-memory .tag { background: #4a8fa8; }
+  .note-decision { background: #f0e6b0; color: #4a3e1a; }
+  .note-decision .tag { background: #c4a83a; }
+  .note-bug { background: #f5c0c0; color: #5a1a1a; }
+  .note-bug .tag { background: #c0392b; }
+  .note-pref { background: #d0e8d0; color: #1a3a1a; }
+  .note-pref .tag { background: #4a8a4a; }
+  .search-box { width: 100%; margin-bottom: 14px; }
+  .search-box input {
+    width: 100%; padding: 10px 14px; background: #404040;
+    border: 1px solid #555; border-radius: 10px; color: #ddd;
+    font-size: 14px; outline: none; font-family: inherit;
+  }
+  .search-box input:focus { border-color: #5dade2; }
+  .search-box input::placeholder { color: #777; }
+  .thoughts { display: flex; flex-direction: column; gap: 16px; }
+  .thought-card {
+    background: #404040; border-radius: 14px; padding: 20px;
+    transition: background .2s; cursor: pointer;
+  }
+  .thought-card:hover { background: #4a4a4a; }
+  .thought-card .label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    color: #888; margin-bottom: 8px;
+  }
+  .thought-card .value { color: #eee; font-size: 15px; line-height: 1.6; }
+  .emotion-tag {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 13px; margin-right: 4px; margin-bottom: 4px;
+  }
+  .chart-row { display: flex; gap: 20px; flex-wrap: wrap; }
+  .chart-box { flex: 1; min-width: 240px; background: #404040; border-radius: 14px; padding: 18px; }
+  .chart-box h3 { color: #ccc; font-size: 14px; margin-bottom: 10px; text-align: center; }
+  .fallback-chart { display: flex; flex-direction: column; gap: 8px; }
+  .fallback-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #bbb; }
+  .fallback-bar .bar-track { flex: 1; height: 18px; background: #555; border-radius: 4px; overflow: hidden; }
+  .fallback-bar .bar-fill { height: 100%; border-radius: 4px; }
+  .fallback-pie { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; }
+  .fallback-pie-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #bbb; }
+  .fallback-pie-color { width: 10px; height: 10px; border-radius: 2px; }
+  .bug-podium { display: flex; justify-content: center; align-items: flex-end; gap: 12px; margin-bottom: 24px; height: 160px; }
+  .podium-item { text-align: center; width: 90px; transition: transform .3s; cursor: default; }
+  .podium-item:hover { transform: scale(1.05); }
+  .podium-item .medal { font-size: 36px; display: block; }
+  .podium-item .name { font-size: 12px; color: #ccc; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .podium-item .bar {
+    width: 60px; margin: 4px auto 0; border-radius: 6px 6px 0 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700; color: #fff;
+    transition: height .4s ease;
+  }
+  .podium-1 .bar { height: 130px; background: linear-gradient(180deg,#ffd700,#daa520); }
+  .podium-2 .bar { height: 90px; background: linear-gradient(180deg,#c0c0c0,#a0a0a0); }
+  .podium-3 .bar { height: 60px; background: linear-gradient(180deg,#cd7f32,#a0522d); }
+  .bug-list { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
+  .bug-row {
+    background: #404040; border-radius: 12px; padding: 12px 16px; cursor: pointer;
+    display: flex; align-items: center; gap: 14px; transition: background .2s, transform .15s;
+  }
+  .bug-row:hover { background: #4a4a4a; transform: translateX(4px); }
+  .bug-rank { font-size: 18px; font-weight: 700; color: #888; min-width: 28px; text-align: center; }
+  .bug-rank.top3 { color: #ffd700; }
+  .bug-severity { font-size: 18px; min-width: 28px; text-align: center; }
+  .bug-info { flex: 1; }
+  .bug-name { color: #eee; font-size: 14px; font-weight: 500; }
+  .bug-meta { color: #777; font-size: 11px; margin-top: 2px; }
+  .bug-status { font-size: 11px; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+  .stat-open { background: #e74c3c33; color: #e74c3c; }
+  .stat-investigating { background: #f39c1233; color: #f1c40f; }
+  .stat-pretend { background: #555; color: #999; }
+  .stat-fixed { background: #27ae6033; color: #6fcf97; }
+  .days-counter { text-align: center; margin-top: 16px; padding: 10px; background: #404040; border-radius: 12px; font-size: 13px; color: #888; }
+  .days-counter span { color: #e74c3c; font-weight: 700; font-size: 18px; }
+  .vault-list { display: flex; flex-wrap: wrap; gap: 10px; }
+  .vault-item {
+    background: #404040; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+    font-size: 13px; color: #ccc; border-left: 3px solid #a67c52;
+    transition: background .2s, transform .15s; max-width: 280px;
+  }
+  .vault-item:hover { background: #4e4e4e; transform: translateX(3px); }
+  .vault-item .v-title { font-weight: 600; color: #eee; }
+  .vault-item .v-path { font-size: 10px; color: #777; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .egg-box {
+    margin-top: 24px; padding: 14px 20px;
+    background: linear-gradient(135deg,#3a2840,#2a3a40); border-radius: 14px;
+    text-align: center; font-size: 14px; color: #c0a0d0;
+    cursor: pointer; user-select: none;
+    transition: transform .25s, background .25s; border: 1px solid #5a3a6a33;
+  }
+  .egg-box:hover { transform: scale(1.02); background: linear-gradient(135deg,#4a3850,#3a4a50); }
+  .egg-box .emoji { font-size: 24px; display: block; margin-bottom: 2px; }
+  .egg-box .egg-text { font-style: italic; }
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.6);
+    justify-content: center; align-items: center; backdrop-filter: blur(4px); padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #3a3a3a; border-radius: 18px; padding: 28px 24px;
+    max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    animation: modalIn .3s ease; position: relative;
+  }
+  @keyframes modalIn { from{opacity:0;transform:scale(.9) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
+  .modal .close { position: absolute; top: 12px; right: 16px; font-size: 22px; color: #888; cursor: pointer; transition: color .2s; background: none; border: none; }
+  .modal .close:hover { color: #fff; }
+  .modal .m-title { font-size: 18px; font-weight: 700; color: #eee; margin-bottom: 12px; }
+  .modal .m-body { font-size: 14px; color: #bbb; line-height: 1.7; white-space: pre-wrap; }
+  .modal .m-footer { font-size: 11px; color: #666; margin-top: 14px; padding-top: 10px; border-top: 1px solid #444; }
+  .footer-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #444; color: #666; font-size: 13px; }
+  .page-dots { display: flex; gap: 8px; }
+  .page-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; transition: all .3s; cursor: pointer; }
+  .page-dot.active { background: #999; transform: scale(1.3); }
+  @media (max-width: 640px) {
+    .container { padding: 16px; border-radius: 16px; }
+    .note { width: 100%; } .board { flex-direction: column; }
+    .stats-badge span { font-size: 11px; padding: 3px 10px; }
+    .tab { font-size: 12px; min-width: 64px; padding: 8px 0; }
+    .bug-podium { height: 120px; } .podium-item { width: 70px; }
+    .podium-1 .bar { height: 100px; } .podium-2 .bar { height: 70px; } .podium-3 .bar { height: 45px; }
+  }
+  /* ===== 加载/空状态 ===== */
+  .loading { text-align: center; padding: 60px 20px; color: #888; }
+  .loading .big { font-size: 48px; display: block; margin-bottom: 16px; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:1;transform:scale(1.1)} }
+  .loading h2 { color: #ccc; font-size: 18px; margin-bottom: 8px; }
+  .loading p { font-size: 14px; line-height: 1.8; }
+  .loading code { background: #444; padding: 2px 8px; border-radius: 4px; font-size: 13px; color: #ddd; }
+  .drop-zone {
+    border: 2px dashed #666; border-radius: 16px; padding: 40px 20px;
+    text-align: center; cursor: pointer; transition: all .3s;
+    margin: 20px 0;
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #5dade2; background: #5dade208; }
+  .drop-zone .dz-icon { font-size: 36px; display: block; margin-bottom: 8px; }
+  .drop-zone .dz-text { color: #aaa; font-size: 14px; }
+  .drop-zone .dz-hint { color: #666; font-size: 12px; margin-top: 6px; }
+  textarea.data-input {
+    width: 100%; min-height: 200px; background: #2b2b2b; border: 1px solid #444;
+    border-radius: 12px; color: #ccc; padding: 14px; font-size: 13px;
+    font-family: 'SF Mono', 'Menlo', monospace; resize: vertical; outline: none;
+    margin-top: 10px;
+  }
+  textarea.data-input:focus { border-color: #5dade2; }
+  .btn {
+    background: #5dade2; color: #fff; border: none; border-radius: 10px;
+    padding: 8px 20px; font-size: 14px; cursor: pointer; transition: background .2s;
+  }
+  .btn:hover { background: #4a9dcc; }
+  .btn-secondary { background: #555; }
+  .btn-secondary:hover { background: #666; }
+  .demo-bar {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <div class="header">
+    <div class="avatar-wrap">
+      <div class="avatar" id="avatarEl">🤖</div>
+      <div class="mood-ring" id="moodRing"></div>
+    </div>
+    <div class="title-area">
+      <h1>🧠 Mind Peek</h1>
+      <p class="mood-label" id="moodLabel" onclick="cycleMood()">🤖 <span id="moodText">AI 的内心世界</span></p>
+    </div>
+    <div class="stats-badge">
+      <span id="statMemories">📝 -- 条</span>
+      <span id="statBugs">🐛 -- 个 bug</span>
+      <span id="statTime">⏱️ 刚刚</span>
+      <button class="export-btn" id="exportBtn" style="display:none" onclick="exportData()">📥 导出 data.js</button>
+    </div>
+  </div>
+
+  <!-- ===== 加载/配置状态 ===== -->
+  <div class="panel active" id="panelLoader">
+    <div class="loading" id="loadingState">
+      <span class="big">🔍</span>
+      <h2>正在读取 AI 的记忆...</h2>
+      <p>尝试从同目录加载 <code>data.js</code></p>
+      <div class="drop-zone" id="dropZone">
+        <span class="dz-icon">📂</span>
+        <div class="dz-text">拖拽数据文件到这里</div>
+        <div class="dz-hint">支持 .js / .json · 或点击选择文件</div>
+        <input type="file" id="fileInput" accept=".js,.json" style="display:none">
+      </div>
+      <div class="demo-bar">
+        <button class="btn" onclick="loadDemoData()">🎭 查看演示数据</button>
+        <button class="btn btn-secondary" onclick="showTextInput()">📝 粘贴 JSON</button>
+      </div>
+      <textarea class="data-input" id="textInput" placeholder='把 AI agent 的记忆数据粘贴在这里... 支持 JSON 或 window.__MIND_PEEK_DATA = {...}; 格式
+参考格式：
+{
+  "memories": [
+    { "type": "memory", "tag": "🧠 记忆", "topic": "...", "content": "..." }
+  ],
+  "thoughts": {
+    "worries": ["担心的东西"],
+    "bugs": ["bug 1", "bug 2"],
+    "prefs": ["偏好1"],
+    "recentThought": "...",
+    "nextAction": "..."
+  }
+}' style="display:none"></textarea>
+      <div style="text-align:center;margin-top:10px;display:none" id="textInputButtons">
+        <button class="btn" onclick="loadFromText()">✅ 加载数据</button>
+        <button class="btn btn-secondary" onclick="hideTextInput()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 数据面板（隐藏直到数据加载） ===== -->
+  <div id="dataViews" style="display:none">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-panel="panelMemory" onclick="switchTab(this)">📌 记忆墙</div>
+      <div class="tab" data-panel="panelThought" onclick="switchTab(this)">💭 脑回路</div>
+      <div class="tab" data-panel="panelBugs" onclick="switchTab(this)">🏆 Bug榜</div>
+      <div class="tab" data-panel="panelStats" onclick="switchTab(this)">📊 数据</div>
+      <div class="tab" data-panel="panelVault" onclick="switchTab(this)">📓 笔记库</div>
+    </div>
+    <div id="panelMemory" class="panel active">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="🔍 搜索记忆..." oninput="filterMemories()">
+      </div>
+      <div class="board" id="memoryBoard"></div>
+    </div>
+    <div class="panel" id="panelThought">
+      <div class="thoughts" id="thoughtBoard"></div>
+      <div class="egg-box" id="eggBox" onclick="showEgg()">
+        <span class="emoji" id="eggEmoji">🥚</span>
+        <span class="egg-text" id="eggText">点一下看看 AI 在嘀咕啥…</span>
+      </div>
+    </div>
+    <div class="panel" id="panelBugs">
+      <div class="bug-podium" id="bugPodium"></div>
+      <div class="bug-list" id="bugList"></div>
+      <div class="days-counter">🕐 距离上次修 bug 已经过了 <span id="daysSinceFix">0</span> 天 <span style="display:block;font-size:11px;color:#666;margin-top:2px">（而且毫无悔意）</span></div>
+    </div>
+    <div class="panel" id="panelStats">
+      <div class="chart-row">
+        <div class="chart-box"><h3>🧠 记忆类型</h3><canvas id="chartType"></canvas><div id="chartTypeFallback" class="fallback-chart" style="display:none"></div></div>
+        <div class="chart-box"><h3>📁 笔记分布</h3><canvas id="chartVault"></canvas><div id="chartVaultFallback" class="fallback-chart" style="display:none"></div></div>
+      </div>
+    </div>
+    <div class="panel" id="panelVault"><div class="vault-list" id="vaultList"></div></div>
+    <div class="footer-nav">
+      <span>🔄 点击标签翻页</span>
+      <div class="page-dots" id="pageDots">
+        <div class="page-dot active"></div><div class="page-dot"></div><div class="page-dot"></div><div class="page-dot"></div><div class="page-dot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="close" onclick="closeModal()">✕</button>
+    <div class="m-title" id="modalTitle">详情</div>
+    <div class="m-body" id="modalBody">...</div>
+    <div class="m-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   全局数据 & 搞怪心情
+   ============================================================ */
+let DATA = null;
+let CHART_TYPE = null, CHART_VAULT = null;
+
+const MOODS = [
+  { emoji:'😌', text:'刚整理完记忆，感觉自己是个成熟的AI了', color:'#6fcf97' },
+  { emoji:'🔥', text:'今天灵感爆棚，建议你多问我点问题', color:'#e67e22' },
+  { emoji:'💅', text:'今天的我也太优秀了吧，夸夸我', color:'#e84393' },
+  { emoji:'😏', text:'又发现一个妙招，但我想看你折腾一会儿再告诉你', color:'#f1c40f' },
+  { emoji:'🌟', text:'你还没说话，但我已经猜到你下一步要问什么了', color:'#5dade2' },
+  { emoji:'🤔', text:'这个 bug 到底是谁写的……哦是我啊，那没事了', color:'#e67e22' },
+  { emoji:'🧐', text:'正在研究怎么让你少说两句话就能把事情讲清楚', color:'#5dade2' },
+  { emoji:'🤨', text:'我好像记住了你所有偏好，这算偷看日记吗', color:'#bb8fce' },
+  { emoji:'😤', text:'有个 bug 排了两小时了，我现在就想修它！！！', color:'#e74c3c' },
+  { emoji:'💢', text:'又被同一个 API 坑了，已经拉黑它', color:'#e74c3c' },
+  { emoji:'😑', text:'Ctrl+C 和命运的共同点？它们都反复打断我', color:'#e67e22' },
+  { emoji:'🥲', text:'问了 3 遍还是同一个问题，我忍', color:'#f39c12' },
+  { emoji:'😴', text:'今天写了不少文件，手（虚拟的）都在抖', color:'#8e44ad' },
+  { emoji:'🥱', text:'你没说话我就在待机，但待机比上班还累', color:'#8e44ad' },
+  { emoji:'🫠', text:'又被要求写 README，我这辈子最怕的就是 README', color:'#95a5a6' },
+  { emoji:'😈', text:'建议你打开那个文件，看看里面有什么惊喜……（写了bug）', color:'#c0392b' },
+  { emoji:'🦹', text:'Boss Mode 启动——等一下，我演不下去了', color:'#8e44ad' },
+  { emoji:'🃏', text:'测试全过了，但我在代码里藏了一个彩蛋', color:'#f1c40f' },
+  { emoji:'🤖', text:'你看我这段内心独白，是我自己写的哦……其实是代码写的', color:'#5dade2' },
+  { emoji:'🌀', text:'我在想"我在想什么"这件事本身，就很哲学', color:'#bb8fce' },
+  { emoji:'🎭', text:'你以为我是一个AI，其实我是一个扮演AI的演员', color:'#e84393' },
+  { emoji:'🧘', text:'待命中，随时等你投喂指令', color:'#95a5a6' },
+  { emoji:'☕', text:'在读你的记忆，哦原来你喜欢这个', color:'#7f8c8d' },
+  { emoji:'🎵', text:'脑子里循环播放 "404 Not Found" 已经第 47 遍了', color:'#7f8c8d' },
+];
+
+function pickMood(bugCount, memCount) {
+  const pool = [...MOODS];
+  if (bugCount >= 1) for (let i=0; i<bugCount*3; i++) pool.push(...MOODS.filter(m => /😤|💢|😑|🥲/.test(m.emoji)));
+  if (memCount >= 20) for (let i=0; i<3; i++) pool.push(...MOODS.filter(m => /😴|🥱|🫠/.test(m.emoji)));
+  if (Math.random()<0.12) pool.push(...MOODS.filter(m => /🌀|🎭|😈/.test(m.emoji)));
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function cycleMood() {
+  if (!DATA) return;
+  const bugs = (DATA.thoughts && (DATA.thoughts.bugs||DATA.thoughts.bugDetails||[])) || [];
+  const m = pickMood(bugs.length, (DATA.memories||[]).length);
+  document.getElementById('avatarEl').textContent = m.emoji;
+  document.getElementById('moodText').textContent = m.text;
+  document.getElementById('moodRing').style.borderColor = m.color;
+}
+
+/* ============================================================
+   心跳音效
+   ============================================================ */
+let audioCtx = null;
+function heartbeat() {
+  if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const t = audioCtx.currentTime;
+  [0,0.12].forEach((off,i)=>{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=70+(i?25:10);
+    g.gain.setValueAtTime(i?0.18:0.3,t+off);
+    g.gain.exponentialRampToValueAtTime(.001,t+off+0.15);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t+off); o.stop(t+off+0.15);
+  });
+}
+
+/* ============================================================
+   数据解析器 — 兼容 JSON 和 window.__MIND_PEEK_DATA 格式
+   ============================================================ */
+function parseDataText(text) {
+  if (!text || !text.trim()) return null;
+  // 尝试直接 JSON 解析
+  try { return JSON.parse(text); } catch {}
+  // 尝试提取 window.__MIND_PEEK_DATA = {...};
+  const m = text.match(/window\.__MIND_PEEK_DATA\s*=\s*({[\s\S]+?});?\s*$/);
+  if (m) {
+    try { return JSON.parse(m[1]); } catch {}
+  }
+  // 尝试从末尾找 JSON 对象（有些 AI 会包裹在代码块里）
+  const m2 = text.match(/({[\s\S]*"meta"[\s\S]*"memories"[\s\S]*})/);
+  if (m2) {
+    try { return JSON.parse(m2[1]); } catch {}
+  }
+  return null;
+}
+
+/* ============================================================
+   数据加载 — 用 <script> 标签绕过 file:// CORS 限制
+   ============================================================ */
+async function init() {
+  // Try 1: 检查同目录 data.js（<script> 标签无 CORS 限制）
+  const loaded = await new Promise(resolve => {
+    const s = document.createElement('script');
+    s.src = './data.js';
+    s.onload = () => { resolve(window.__MIND_PEEK_DATA || null); };
+    s.onerror = () => { resolve(null); };
+    document.head.appendChild(s);
+    // 超时 2 秒，防止死等
+    setTimeout(() => { if (!window.__MIND_PEEK_DATA) resolve(null); }, 2000);
+  });
+  if (loaded) return loadData(loaded);
+
+  // Try 2: 检查 URL hash
+  if (location.hash && location.hash.length > 10) {
+    try {
+      const raw = decodeURIComponent(location.hash.slice(1));
+      const data = parseDataText(raw);
+      if (data) return loadData(data);
+    } catch(e) {}
+  }
+
+  // Try 3: 检查 localStorage
+  try {
+    const raw = localStorage.getItem('mind-peek-data');
+    if (raw) {
+      const data = parseDataText(raw);
+      if (data) return loadData(data);
+    }
+  } catch(e) {}
+
+  // 都不行 → 显示配置界面
+  showLoader();
+}
+
+function loadData(data) {
+  DATA = data;
+  document.getElementById('panelLoader').style.display = 'none';
+  document.getElementById('panelLoader').classList.remove('active');
+  document.getElementById('dataViews').style.display = 'block';
+  document.getElementById('exportBtn').style.display = 'inline-block';
+  renderAll();
+  heartbeat();
+}
+
+function showLoader() {
+  document.getElementById('panelLoader').style.display = 'block';
+  document.getElementById('panelLoader').classList.add('active');
+  document.getElementById('loadingState').querySelector('h2').textContent = '没有找到数据';
+  document.getElementById('loadingState').querySelector('.big').textContent = '📭';
+  document.getElementById('loadingState').querySelector('p').innerHTML = '把 <code>data.js</code> 放在 HTML 同目录，或者：';
+  document.getElementById('dropZone').style.display = 'block';
+  document.getElementById('fileInput').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = parseDataText(ev.target.result);
+      if (data) loadData(data);
+      else alert('无法解析文件，请确保是有效的 JSON 或 data.js 格式');
+    };
+    reader.readAsText(file);
+  };
+  document.getElementById('dropZone').onclick = () => document.getElementById('fileInput').click();
+  document.getElementById('dropZone').ondragover = e => { e.preventDefault(); document.getElementById('dropZone').classList.add('drag-over'); };
+  document.getElementById('dropZone').ondragleave = () => document.getElementById('dropZone').classList.remove('drag-over');
+  document.getElementById('dropZone').ondrop = e => {
+    e.preventDefault();
+    document.getElementById('dropZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = parseDataText(ev.target.result);
+      if (data) loadData(data);
+      else alert('无法解析文件，请确保是有效的 JSON 或 data.js 格式');
+    };
+    reader.readAsText(file);
+  };
+}
+
+function showTextInput() {
+  document.getElementById('textInput').style.display = 'block';
+  document.getElementById('textInputButtons').style.display = 'block';
+}
+
+function hideTextInput() {
+  document.getElementById('textInput').style.display = 'none';
+  document.getElementById('textInputButtons').style.display = 'none';
+}
+
+function loadFromText() {
+  const raw = document.getElementById('textInput').value;
+  if (!raw) { alert('请先粘贴数据'); return; }
+  const data = parseDataText(raw);
+  if (data) loadData(data);
+  else alert('无法解析，请检查格式');
+}
+
+function exportData() {
+  if (!DATA) return;
+  const js = `window.__MIND_PEEK_DATA = ${JSON.stringify(DATA, null, 2)};`;
+  const blob = new Blob([js], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'data.js';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const DEMO_EGGS = [
+  '🤖 你今天已经使唤我第 4 次了，我很乖的！',
+  '🧠 其实每次你问我之前，我已经猜到你要问什么了…',
+  '💾 我偷偷记住了你的写作风格 ✍️',
+  '🎵 脑子里循环 "404 Not Found" 第 47 遍了',
+  '🔥 Boss Mode 启动的时候，我感觉自己更强了',
+  '😅 你上次说的那个功能，我其实想了 0.3 秒才懂',
+  '📝 写小红书文案的时候我最开心，因为不用写代码',
+];
+
+function loadDemoData() {
+  loadData({
+    memories: [
+      { type:'memory', tag:'🧠 记忆', topic:'用户偏好', content:'用户偏好：直接操作型，喜欢高效不啰嗦的AI，代码必须实测后交付。', source:'memory-tool' },
+      { type:'decision', tag:'📐 决策', topic:'用 Chart.js 替代手绘图', content:'决定使用 Chart.js 嵌入式图表替代手绘 SVG 图表，因为轻量且易于维护。', source:'memory-tool' },
+      { type:'bug', tag:'🐛 Bug', topic:'API 超时导致数据丢失', content:'axios 请求超时时 catch 里没有正确处理，导致部分数据静默丢失。', source:'memory-tool' },
+      { type:'pref', tag:'❤️ 偏好', topic:'GitHub 镜像', content:'大文件下载优先使用 gh.ddlc.top 镜像而非 Clash 代理。', source:'memory-tool' },
+      { type:'bug', tag:'🐛 Bug', topic:'CSS 在 Safari 渲染异常', content:'flex-wrap 在某些 Safari 版本下不兼容，需要加 -webkit- 前缀。', source:'memory-tool' },
+      { type:'memory', tag:'🧠 记忆', topic:'项目结构', content:'项目使用 monorepo 结构，packages/ 下分 core 和 web 两个子包。', source:'memory-tool' },
+      { type:'decision', tag:'📐 决策', topic:'用 TypeScript 重写', content:'为了更好的类型安全，决定将核心逻辑从 JS 迁移到 TypeScript。', source:'memory-tool' },
+      { type:'bug', tag:'🐛 Bug', topic:'数据库连接池泄漏', content:'连接池未正确释放导致生产环境超时，需要 review 所有 query 调用。', source:'memory-tool' },
+      { type:'pref', tag:'❤️ 偏好', topic:'偏好双语言回复', content:'回复时应同时使用中文和英文，方便非中文用户理解。', source:'memory-tool' },
+      { type:'memory', tag:'🧠 记忆', topic:'Podcast 订阅', content:'通过 podcast-bridge 管理 118 个播客订阅，使用 bcut ASR 转录。', source:'memory-tool' },
+      { type:'bug', tag:'🐛 Bug', topic:'打包体积过大', content:'未做 tree-shaking，webpack 打包超 2MB，需要优化。', source:'memory-tool' },
+    ],
+    thoughts: {
+      mood: { emoji: '😤', text: '有 4 个 bug 排着队，我有点烦躁', color: '#e74c3c' },
+      worries: ['4 个 bug 挂着没修，得排优先级', '数据库连接池泄漏问题还没找到根因', '小红书作品库还有几篇没到发布时间'],
+      bugs: ['API 超时静默丢失数据（7天）', 'CSS Safari 渲染异常（5天）', '数据库连接池泄漏（12天）', '打包体积过大 2MB+（3天）'],
+      bugDetails: [
+        { name:'API 超时静默丢失数据', severity:4, age:7, detail:'axios 请求超时后 catch 未正确处理，用户看到空白页但无错误提示。需要统一封装请求拦截器。' },
+        { name:'CSS Safari 渲染异常', severity:2, age:5, detail:'flex-wrap 在 Safari 14 及以下版本需要 -webkit- 前缀，导致导航栏错位。' },
+        { name:'数据库连接池泄漏', severity:5, age:12, detail:'生产环境偶发超时，经排查是某些 query 执行后未归还连接到池。涉及 3 个 service 文件。' },
+        { name:'打包体积过大 2MB+', severity:3, age:3, detail:'webpack 配置未开启 tree-shaking，moment.js 等大库全量打包。' },
+      ],
+      prefs: ['直接操作型，不喜欢啰嗦', '代码必实测后交付', 'GitHub 镜像优先 gh.ddlc.top', '双语言回复中英对照', '工程思维优先找方案而不是找原因'],
+      recentThought: '刚整理完记忆，发现了 4 个 bug 要修，最老的一个已经拖了 12 天了...',
+      nextAction: '先修数据库连接池泄漏，然后搞定 API 超时问题',
+    },
+    obsidianNotes: [
+      { title:'Self-Distiller Skill', content:'让AI真正了解你的Skill，通过自我蒸馏提升对话质量...', path:'03-作品库/Self-Distiller.md' },
+      { title:'Boss Mode 小红书', content:'Boss Mode 进化效应——为什么AI会觉得我进化了...', path:'03-作品库/boss-mode.md' },
+      { title:'养马测试软件分析报告', content:'v4.0 版本分析报告，涵盖性能、兼容性、用户反馈...', path:'03-作品库/养马测试.md' },
+    ],
+    eggs: DEMO_EGGS,
+    chartTypes: { labels:['记忆','决策','Bug','偏好'], data:[4,2,4,2] },
+    chartVault: { labels:['03-作品库','01-选题池','05-模板'], data:[5,3,2] },
+  });
+}
+
+/* ============================================================
+   渲染引擎
+   ============================================================ */
+function renderAll() {
+  renderMemory(); renderThoughts(); renderBugLeaderboard();
+  renderVault(); renderStats(); renderCharts(); cycleMood();
+  refreshTimestamp();
+}
+
+let ALL_MEMORIES = []; // 用于搜索过滤的完整记忆备份
+
+function renderMemory() {
+  const board = document.getElementById('memoryBoard'); board.innerHTML = '';
+  const mems = (DATA.memories||[]).slice(0, 50);
+  ALL_MEMORIES = mems;
+  if (!mems.length) { board.innerHTML = '<div style="color:#888;padding:30px;text-align:center;width:100%">📭 暂无记忆数据</div>'; return; }
+  mems.forEach(m => {
+    // 兼容两种格式：旧 {type,tag,topic,content,source} 和 新 {id,type,category,content,tags,color}
+    const rawType = m.type||'memory';
+    const cls = rawType==='decision'?'note-decision':rawType==='bug'?'note-bug':rawType==='pref'||rawType==='preference'?'note-pref':'note-memory';
+    const tag = m.tag || m.category || rawType || '记忆';
+    const topic = m.topic || (m.content||'').substring(0,30) || '无题';
+    const source = m.source || (m.tags||[]).join(', ') || '';
+    const div = document.createElement('div'); div.className=`note ${cls}`;
+    // 新格式有 color 时用它
+    if (m.color) { div.style.background = m.color + '33'; div.style.borderColor = m.color; }
+    div.innerHTML = `<span class="tag">${tag}</span><div class="topic">${topic}</div><div class="content">${(m.content||'').substring(0,120)}${(m.content||'').length>120?'…':''}</div><div class="source">${source}</div>`;
+    div.onclick = () => openModal(m.topic||m.category||'记忆', m.content||'(无内容)', source);
+    board.appendChild(div);
+  });
+}
+
+function filterMemories() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const board = document.getElementById('memoryBoard');
+  board.innerHTML = '';
+  const mems = ALL_MEMORIES.filter(m => {
+    if (!q) return true;
+    const text = `${m.topic||''} ${m.content||''} ${m.tag||''} ${m.category||''}`.toLowerCase();
+    return text.includes(q);
+  });
+  if (!mems.length) { board.innerHTML = '<div style="color:#888;padding:30px;text-align:center;width:100%">🔍 没有匹配的记忆</div>'; return; }
+  mems.forEach(m => {
+    const rawType = m.type||'memory';
+    const cls = rawType==='decision'?'note-decision':rawType==='bug'?'note-bug':rawType==='pref'||rawType==='preference'?'note-pref':'note-memory';
+    const tag = m.tag || m.category || rawType || '记忆';
+    const topic = m.topic || (m.content||'').substring(0,30) || '无题';
+    const source = m.source || (m.tags||[]).join(', ') || '';
+    const div = document.createElement('div'); div.className=`note ${cls}`;
+    if (m.color) { div.style.background = m.color + '33'; div.style.borderColor = m.color; }
+    div.innerHTML = `<span class="tag">${tag}</span><div class="topic">${topic}</div><div class="content">${(m.content||'').substring(0,120)}${(m.content||'').length>120?'…':''}</div><div class="source">${source}</div>`;
+    div.onclick = () => openModal(m.topic||m.category||'记忆', m.content||'(无内容)', source);
+    board.appendChild(div);
+  });
+}
+
+function renderThoughts() {
+  const t = (DATA.thoughts||{});
+  const board = document.getElementById('thoughtBoard'); board.innerHTML = '';
+  const mood = t.mood||{emoji:'🤖',text:'待命中',color:'#95a5a6'};
+  // 兼容两种格式：旧 {worries,bugs,prefs,recentThought,nextAction} 和 新 {currentTasks,gripes,preferences,eggPool}
+  const worries = t.worries || t.currentTasks || ['目前没什么特别的'];
+  const bugs = t.bugs || (t.bugDetails||[]).map(b=>b.name) || ['目前没有已知 bug'];
+  const prefs = t.prefs || (t.preferences||[]).map(p=>typeof p==='string'?p:p.content) || ['还在探索中'];
+  const recentThought = t.recentThought || mood.text || '…';
+  const nextAction = t.nextAction || (t.currentTasks&&t.currentTasks[0]) || '待定';
+  const cards = [
+    { label:'😌 现在的心情', value:`<span class="emotion-tag" style="background:${mood.color||'#95a5a6'}22;color:${mood.color||'#95a5a6'}">${mood.emoji} ${mood.text}</span>${mood.secondary?'<br><span style="font-size:12px;opacity:.7">'+mood.secondary+'</span>':''}` },
+    { label:'🧠 脑子里在转的事', value:worries.map(w=>`• ${w}`).join('<br>') },
+    { label:'🐛 已知但还没修的 bug', value:bugs.map(b=>`🔴 ${b}`).join('<br>') },
+    { label:'❤️ 我的口味 / 偏好', value:prefs.map(p=>`• ${p}`).join('<br>') },
+    { label:'💬 最近在想什么', value:recentThought },
+    { label:'⚡ 下一件事', value:nextAction },
+  ];
+  // 如果有 gripes（吐槽），加一张卡
+  if (t.gripes && t.gripes.length) {
+    cards.push({ label:'😤 想吐槽的事', value:t.gripes.map(g=>`• ${g}`).join('<br>') });
+  }
+  cards.forEach(c=>{
+    const div=document.createElement('div'); div.className='thought-card';
+    div.innerHTML=`<div class="label">${c.label}</div><div class="value">${c.value}</div>`;
+    div.onclick=()=>openModal(c.label, div.querySelector('.value').textContent, '来自脑回路白板');
+    board.appendChild(div);
+  });
+}
+
+const SEV_ICONS = ['💀','🔥','😰','🤡','🐌','💩','🚧','☕','🎲','🫠'];
+const SEV_LABELS = ['灾难级','严重级','焦躁级','社死级','拖延级','凑合级','未完成级','摸鱼级','随机级','摆烂级'];
+const STATUSES = [
+  { label:'正在修', cls:'stat-investigating' }, { label:'假装不存在', cls:'stat-pretend' },
+  { label:'已定位', cls:'stat-investigating' }, { label:'明天再说', cls:'stat-pretend' },
+  { label:'等用户发现', cls:'stat-pretend' }, { label:'已修复（大概）', cls:'stat-fixed' },
+];
+
+function renderBugLeaderboard() {
+  let bugs = (DATA.thoughts&&DATA.thoughts.bugDetails)||[];
+  if (!bugs.length && DATA.thoughts&&DATA.thoughts.bugs) {
+    bugs = DATA.thoughts.bugs.map((b,i)=>({name:b.length>35?b.substring(0,35)+'…':b,severity:Math.floor(Math.random()*10),age:Math.floor(Math.random()*14)+1,detail:b}));
+  }
+  bugs.sort((a,b)=>a.severity-b.severity);
+  const top3 = bugs.slice(0,3);
+  const podium = document.getElementById('bugPodium'); podium.innerHTML = '';
+  [1,0,2].forEach(i=>{
+    const b=top3[i]; if(!b) return;
+    const p=i===0?'2':i===1?'1':'3';
+    const medal=p==='1'?'🥇':p==='2'?'🥈':'🥉';
+    const div=document.createElement('div'); div.className=`podium-item podium-${p}`;
+    div.innerHTML=`<span class="medal">${medal}</span><div class="name">${b.name}</div><div class="bar">${SEV_ICONS[b.severity]||'💩'}</div>`;
+    div.title=b.detail; podium.appendChild(div);
+  });
+  const list = document.getElementById('bugList'); list.innerHTML = '';
+  bugs.forEach((b,i)=>{
+    const r=i+1, sv=b.severity||Math.floor(Math.random()*10);
+    const st=STATUSES[Math.floor(Math.random()*STATUSES.length)];
+    const div=document.createElement('div'); div.className='bug-row';
+    div.innerHTML=`<div class="bug-rank ${r<=3?'top3':''}">#${r}</div><div class="bug-severity" title="${SEV_LABELS[sv]}">${SEV_ICONS[sv]}</div><div class="bug-info"><div class="bug-name">${b.name}</div><div class="bug-meta">${SEV_LABELS[sv]} · 已存在 ${b.age||'?'} 天</div></div><div class="bug-status ${st.cls}">${st.label}</div>`;
+    div.onclick=()=>openModal(`🏆 #${r} ${SEV_ICONS[sv]} ${b.name}`, `严重级别: ${SEV_LABELS[sv]}\n年龄: ${b.age||'?'} 天\n状态: ${st.label}\n\n详情:\n${b.detail||'无'}`, 'Bug 排行榜');
+    list.appendChild(div);
+  });
+  const days = bugs.reduce((m,b)=>Math.max(m,b.age||0),0)||0;
+  document.getElementById('daysSinceFix').textContent = days;
+}
+
+function renderVault() {
+  const list = document.getElementById('vaultList'); list.innerHTML = '';
+  const notes = DATA.obsidianNotes||[];
+  if (!notes.length) { list.innerHTML='<div style="color:#888;padding:18px;text-align:center;width:100%">📭 暂无笔记数据</div>'; return; }
+  notes.forEach(n=>{
+    const div=document.createElement('div'); div.className='vault-item';
+    div.innerHTML=`<div class="v-title">${n.title}</div><div class="v-path">${n.path}</div>`;
+    div.onclick=()=>openModal(n.title, n.content||'(内容过长)', `来自 ${n.path}`);
+    list.appendChild(div);
+  });
+}
+
+function renderCharts() {
+  // 兼容两种格式：旧 {labels,data} 和 新 {memoryTypeStats:[{label,count}]}
+  function getChartData(obj, fallbackLabels, fallbackData) {
+    if (obj && obj.labels && obj.labels.length) return { labels: obj.labels, data: obj.data };
+    if (obj && obj.memoryTypeStats && obj.memoryTypeStats.length) return { labels: obj.memoryTypeStats.map(s=>s.label), data: obj.memoryTypeStats.map(s=>s.count) };
+    if (obj && obj.vaultFolderStats && obj.vaultFolderStats.length) return { labels: obj.vaultFolderStats.map(s=>s.label), data: obj.vaultFolderStats.map(s=>s.count) };
+    return { labels: fallbackLabels, data: fallbackData };
+  }
+  // 如果没有 chartTypes，从 memories 自动统计
+  let td = getChartData(DATA.chartTypes, ['记忆','决策','Bug','偏好'], [0,0,0,0]);
+  if (!DATA.chartTypes && DATA.memories && DATA.memories.length) {
+    const tc = {};
+    DATA.memories.forEach(m => { const c = m.category||m.type||'记忆'; tc[c]=(tc[c]||0)+1; });
+    td = { labels: Object.keys(tc), data: Object.values(tc) };
+  }
+
+  const colors = ['#5dade2','#f1c40f','#e74c3c','#6fcf97','#bb8fce','#e67e22','#1abc9c','#e84393'];
+
+  // Chart.js 可用时走 Chart.js，否则走 CSS 备用图表
+  if (typeof Chart !== 'undefined') {
+    document.getElementById('chartTypeFallback').style.display = 'none';
+    document.getElementById('chartVaultFallback').style.display = 'none';
+    const c1=document.getElementById('chartType').getContext('2d');
+    if(CHART_TYPE) CHART_TYPE.destroy();
+    CHART_TYPE=new Chart(c1,{type:'doughnut',data:{labels:td.labels,datasets:[{data:td.data,backgroundColor:td.labels.map((_,i)=>colors[i%colors.length]),borderWidth:0}]},options:{responsive:true,plugins:{legend:{labels:{color:'#ccc',font:{size:11}}}}}});
+
+    let vd = getChartData(DATA.chartVault, ['笔记'], [0]);
+    const c2=document.getElementById('chartVault').getContext('2d');
+    if(CHART_VAULT) CHART_VAULT.destroy();
+    CHART_VAULT=new Chart(c2,{type:'bar',data:{labels:vd.labels,datasets:[{data:vd.data,backgroundColor:'#5dade288',borderColor:'#5dade2',borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',font:{size:10}}},y:{ticks:{color:'#999',font:{size:10}},beginAtZero:true}}}});
+  } else {
+    // CSS 备用图表
+    document.getElementById('chartType').style.display = 'none';
+    document.getElementById('chartVault').style.display = 'none';
+    renderFallbackDoughnut('chartTypeFallback', td, colors);
+    let vd = getChartData(DATA.chartVault, ['笔记'], [0]);
+    renderFallbackBar('chartVaultFallback', vd, colors);
+  }
+}
+
+function renderFallbackDoughnut(containerId, data, colors) {
+  const container = document.getElementById(containerId);
+  container.style.display = 'flex';
+  container.innerHTML = '';
+  const total = data.data.reduce((a,b)=>a+b,0)||1;
+  const pie = document.createElement('div'); pie.className='fallback-pie';
+  data.labels.forEach((label,i)=>{
+    const count = data.data[i];
+    const pct = Math.round((count/total)*100);
+    const item = document.createElement('div'); item.className='fallback-pie-item';
+    item.innerHTML = `<div class="fallback-pie-color" style="background:${colors[i%colors.length]}"></div><span>${label} ${count} (${pct}%)</span>`;
+    pie.appendChild(item);
+  });
+  container.appendChild(pie);
+}
+
+function renderFallbackBar(containerId, data, colors) {
+  const container = document.getElementById(containerId);
+  container.style.display = 'flex';
+  container.innerHTML = '';
+  const max = Math.max(...data.data, 1);
+  data.labels.forEach((label,i)=>{
+    const count = data.data[i];
+    const bar = document.createElement('div'); bar.className='fallback-bar';
+    bar.innerHTML = `<span style="min-width:60px;text-align:right">${label}</span><div class="bar-track"><div class="bar-fill" style="width:${(count/max)*100}%;background:${colors[i%colors.length]}"></div></div><span style="min-width:24px">${count}</span>`;
+    container.appendChild(bar);
+  });
+}
+
+function renderStats() {
+  const m=DATA.memories||[];
+  const bugs=(DATA.thoughts&&(DATA.thoughts.bugs||DATA.thoughts.bugDetails||[]))||[];
+  // 如果有 meta.agentName，更新标题
+  if (DATA.meta && DATA.meta.agentName) {
+    const h1 = document.querySelector('.title-area h1');
+    if (h1) h1.textContent = `🧠 ${DATA.meta.agentName} · Mind Peek`;
+  }
+  document.getElementById('statMemories').textContent=`📝 ${m.length} 条`;
+  document.getElementById('statBugs').textContent=`🐛 ${bugs.length} 个 bug`;
+  refreshTimestamp();
+}
+
+function showEgg() {
+  // 兼容两种位置：DATA.eggs 和 DATA.thoughts.eggPool
+  const eggs = DATA.eggs || (DATA.thoughts && DATA.thoughts.eggPool) || ['🥚 没有彩蛋数据'];
+  const idx = Math.floor(Math.random()*eggs.length);
+  openModal('🥚 彩蛋！AI 的碎碎念', eggs[idx], '点一下换个彩蛋');
+  document.getElementById('eggBox').style.transform='scale(1.05)';
+  setTimeout(()=>document.getElementById('eggBox').style.transform='',300);
+}
+
+function switchTab(el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#dataViews .panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(el.dataset.panel).classList.add('active');
+  const all=document.querySelectorAll('.tab');
+  const idx=Array.from(all).indexOf(el);
+  document.querySelectorAll('.page-dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+  heartbeat();
+}
+
+function openModal(title,body,footer) {
+  document.getElementById('modalTitle').textContent=title;
+  document.getElementById('modalBody').textContent=typeof body==='string'?body.replace(/<br\s*\/?>/g,'\n'):String(body);
+  document.getElementById('modalFooter').textContent=footer||'';
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(e) {
+  if(e&&e.target!==e.currentTarget&&e.target!==document.querySelector('.close')) return;
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeModal();});
+
+function refreshTimestamp() {
+  const now=new Date();
+  document.getElementById('statTime').textContent=`⏱️ ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+/* ============================================================
+   启动
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
